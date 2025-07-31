@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Office Shooting Gallery</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+            touch-action: none;
+            height: 100vh;
+            direction: rtl;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #gameCanvas {
+            display: block;
+            background: linear-gradient(180deg, #87CEEB 0%, #8B4513 60%, #654321 100%);
+            border: 2px solid #333;
+            cursor: none;
+            max-width: 100%;
+            max-height: 100%;
+        }
+        
+        .ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 16px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+            z-index: 10;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 10px;
+        }
+        
+        .crosshair {
+            position: absolute;
+            width: 32px;
+            height: 32px;
+            pointer-events: none;
+            z-index: 5;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="none" stroke="red" stroke-width="3"/><line x1="16" y1="1" x2="16" y2="31" stroke="red" stroke-width="2"/><line x1="1" y1="16" x2="31" y2="16" stroke="red" stroke-width="2"/></svg>') center/contain no-repeat;
+        }
+        
+        .start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 20;
+            text-align: center;
+        }
+        
+        .start-button {
+            padding: 15px 30px;
+            font-size: 18px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            margin: 10px;
+            min-width: 150px;
+            transition: all 0.3s;
+        }
+        
+        .start-button:hover, .start-button:active {
+            background: #0056b3;
+            transform: scale(1.05);
+        }
+        
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95);
+            color: white;
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            z-index: 15;
+            display: none;
+            max-width: 90%;
+        }
+        
+        .parham-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: red;
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            font-size: 20px;
+            font-weight: bold;
+            z-index: 100;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(255,0,0,0.8);
+            border: 3px solid darkred;
+            display: none;
+        }
+        
+        .warning-text {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: yellow;
+            font-size: 14px;
+            text-align: center;
+            background: rgba(0,0,0,0.5);
+            padding: 5px 10px;
+            border-radius: 10px;
+            z-index: 10;
+        }
+        
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+            80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+        }
+        
+        .animate-message {
+            animation: fadeInOut 2.5s ease-in-out;
+        }
+        
+        @media (max-width: 480px) {
+            .ui {
+                font-size: 14px;
+                padding: 8px;
+            }
+            
+            .warning-text {
+                font-size: 12px;
+            }
+            
+            .parham-message {
+                font-size: 18px;
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="start-screen" id="startScreen">
+            <h1>🎯 تیراندازی اداری</h1>
+            <p>روی چهره‌ها کلیک کن!</p>
+            <p>⚠️ مراقب پرهام باش - امتیاز نمیده!</p>
+            <button class="start-button" onclick="startGame()">شروع بازی</button>
+            <button class="start-button" onclick="showInstructions()">راهنما</button>
+        </div>
+        
+        <div class="ui">
+            <div>امتیاز: <span id="score">0</span></div>
+            <div>بهترین: <span id="highScore">0</span></div>
+            <div>زمان: <span id="timer">60</span>s</div>
+        </div>
+        
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="crosshair" id="crosshair"></div>
+        
+        <div class="warning-text">
+            🤡 مراقب پرهام باش! (قرمز - بدون امتیاز)
+        </div>
+        
+        <div class="game-over" id="gameOver">
+            <h2>بازی تمام شد!</h2>
+            <p>امتیاز نهایی: <span id="finalScore">0</span></p>
+            <p>بهترین امتیاز: <span id="finalHighScore">0</span></p>
+            <button class="start-button" onclick="restartGame()">دوباره بازی</button>
+            <button class="start-button" onclick="shareScore()">اشتراک امتیاز</button>
+        </div>
+        
+        <div class="parham-message" id="parhamMessage">
+            kasra kiram dahanet
+        </div>
+    </div>
+
+    <script>
+        // Telegram Web App initialization
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.expand();
+            tg.ready();
+            tg.setBackgroundColor('#667eea');
+            tg.setHeaderColor('#667eea');
+        }
+
+        // Game variables
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const crosshair = document.getElementById('crosshair');
+        
+        let gameState = 'menu'; // menu, playing, gameOver
+        let score = 0;
+        let highScore = parseInt(localStorage.getItem('officeGameHighScore')) || 0;
+        let timeLeft = 60;
+        let targets = [];
+        let gameInterval;
+        let timerInterval;
+        let spawnInterval;
+        
+        // Game settings
+        const FACE_SIZE = 70;
+        const TARGET_LIFETIME = 3500;
+        const SPAWN_RATE = 1200;
+        const PARHAM_SPAWN_CHANCE = 0.15;
+        
+        // Face emojis for targets
+        const normalFaces = ['😀', '😎', '🤓', '😴', '🥱', '😵‍💫', '🤯', '🥸', '🤗', '😋'];
+        const parhamFace = '🤡';
+        
+        // Audio Context for sound effects
+        let audioContext;
+        
+        function initAudio() {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (e) {
+                console.log('Audio not supported');
+            }
+        }
+        
+        function playSound(frequency, duration, type = 'sine') {
+            if (!audioContext) return;
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+            oscillator.type = type;
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + duration);
+        }
+        
+        function playScreamSound() {
+            if (!audioContext) return;
+            
+            // Create a more complex scream sound
+            for (let i = 0; i < 3; i++) {
+                setTimeout(() => {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    // Scream-like frequency modulation
+                    oscillator.frequency.setValueAtTime(800 - i * 100, audioContext.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(300, audioContext.currentTime + 0.4);
+                    oscillator.type = 'sawtooth';
+                    
+                    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.4);
+                }, i * 100);
+            }
+        }
+        
+        class Target {
+            constructor(x, y, isParham = false) {
+                this.x = x;
+                this.y = y;
+                this.size = FACE_SIZE;
+                this.isParham = isParham;
+                this.face = isParham ? parhamFace : normalFaces[Math.floor(Math.random() * normalFaces.length)];
+                this.spawnTime = Date.now();
+                this.startY = y;
+                this.targetY = y - 100;
+                this.currentY = y;
+                this.popSpeed = 2.5;
+                this.poppedUp = false;
+                this.hit = false;
+                this.wobble = 0;
+            }
+            
+            update() {
+                // Pop up animation
+                if (!this.poppedUp && this.currentY > this.targetY) {
+                    this.currentY -= this.popSpeed;
+                } else if (!this.poppedUp) {
+                    this.poppedUp = true;
+                }
+                
+                this.y = this.currentY;
+                this.wobble += 0.1;
+                
+                // Remove after lifetime
+                if (Date.now() - this.spawnTime > TARGET_LIFETIME) {
+                    return false;
+                }
+                return true;
+            }
+            
+            draw() {
+                if (this.hit) return;
+                
+                const wobbleOffset = Math.sin(this.wobble) * 2;
+                const drawX = this.x + wobbleOffset;
+                
+                // Draw target background
+                ctx.fillStyle = this.isParham ? '#FF0000' : '#8B4513';
+                ctx.fillRect(drawX - this.size/2, this.y - this.size/2, this.size, this.size);
+                
+                // Draw border
+                ctx.strokeStyle = this.isParham ? '#800000' : '#654321';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(drawX - this.size/2, this.y - this.size/2, this.size, this.size);
+                
+                // Draw face emoji
+                ctx.font = `${this.size * 0.7}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.face, drawX, this.y - 5);
+                
+                // Draw name for Parham
+                if (this.isParham) {
+                    ctx.font = '12px Arial';
+                    ctx.fillStyle = 'white';
+                    ctx.strokeStyle = 'black';
+                    ctx.lineWidth = 1;
+                    ctx.strokeText('PARHAM', drawX, this.y + this.size/2 - 5);
+                    ctx.fillText('PARHAM', drawX, this.y + this.size/2 - 5);
+                }
+            }
+            
+            checkHit(mouseX, mouseY) {
+                const dx = mouseX - this.x;
+                const dy = mouseY - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                return distance < this.size / 2;
+            }
+        }
+        
+        function showParhamMessage() {
+            const messageEl = document.getElementById('parhamMessage');
+            messageEl.style.display = 'block';
+            messageEl.classList.add('animate-message');
+            
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+                messageEl.classList.remove('animate-message');
+            }, 2500);
+        }
+        
+        function updateUI() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('highScore').textContent = highScore;
+            document.getElementById('timer').textContent = timeLeft;
+        }
+        
+        function spawnTarget() {
+            if (targets.length < 3) {
+                const x = Math.random() * (canvas.width - FACE_SIZE) + FACE_SIZE/2;
+                const y = canvas.height - 50;
+                
+                const isParham = Math.random() < PARHAM_SPAWN_CHANCE;
+                targets.push(new Target(x, y, isParham));
+            }
+        }
+        
+        function gameLoop() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Update and draw targets
+            targets = targets.filter(target => {
+                const alive = target.update();
+                if (alive && !target.hit) {
+                    target.draw();
+                    return true;
+                }
+                return false;
+            });
+            
+            updateUI();
+        }
+        
+        function handleClick(event) {
+            if (gameState !== 'playing') return;
+            
+            // Resume audio context on first interaction
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            let mouseX, mouseY;
+            
+            if (event.touches) {
+                const touch = event.touches[0] || event.changedTouches[0];
+                mouseX = (touch.clientX - rect.left) * scaleX;
+                mouseY = (touch.clientY - rect.top) * scaleY;
+            } else {
+                mouseX = (event.clientX - rect.left) * scaleX;
+                mouseY = (event.clientY - rect.top) * scaleY;
+            }
+            
+            // Play shoot sound
+            playSound(200, 0.1, 'square');
+            
+            // Check hits
+            for (let target of targets) {
+                if (target.checkHit(mouseX, mouseY)) {
+                    target.hit = true;
+                    
+                    if (target.isParham) {
+                        // Special handling for Parham
+                        playScreamSound();
+                        showParhamMessage();
+                        
+                        if (tg) {
+                            tg.HapticFeedback.impactOccurred('heavy');
+                        }
+                    } else {
+                        // Normal target
+                        score += 10;
+                        playSound(400, 0.2);
+                        
+                        if (tg) {
+                            tg.HapticFeedback.impactOccurred('light');
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+        
+        function updateCrosshair(event) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX, clientY;
+            
+            if (event.touches) {
+                if (event.touches.length > 0) {
+                    clientX = event.touches[0].clientX;
+                    clientY = event.touches[0].clientY;
+                } else {
+                    return;
+                }
+            } else {
+                clientX = event.clientX;
+                clientY = event.clientY;
+            }
+            
+            crosshair.style.left = (clientX - 16) + 'px';
+            crosshair.style.top = (clientY - 16) + 'px';
+        }
+        
+        function showInstructions() {
+            alert('🎯 راهنمای بازی:\n\n' +
+                  '• روی چهره‌ها کلیک/تاچ کن تا امتیاز بگیری\n' +
+                  '• هر هدف 10 امتیاز میده\n' +
+                  '• مراقب پرهام باش! (🤡 قرمز)\n' +
+                  '• پرهام امتیاز نمیده ولی سورپرایز داره!\n' +
+                  '• 60 ثانیه وقت داری\n\n' +
+                  'موفق باشی! 🚀');
+        }
+        
+        function startGame() {
+            initAudio();
+            gameState = 'playing';
+            score = 0;
+            timeLeft = 60;
+            targets = [];
+            
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('gameOver').style.display = 'none';
+            
+            // Start game loops
+            gameInterval = setInterval(gameLoop, 1000/60);
+            spawnInterval = setInterval(spawnTarget, SPAWN_RATE);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+        
+        function endGame() {
+            gameState = 'gameOver';
+            
+            clearInterval(gameInterval);
+            clearInterval(spawnInterval);
+            clearInterval(timerInterval);
+            
+            // Update high score
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('officeGameHighScore', highScore.toString());
+            }
+            
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('finalHighScore').textContent = highScore;
+            document.getElementById('gameOver').style.display = 'block';
+            
+            // Send score to Telegram
+            if (tg) {
+                tg.sendData(JSON.stringify({
+                    score: score,
+                    highScore: highScore,
+                    action: 'game_finished'
+                }));
+            }
+        }
+        
+        function restartGame() {
+            startGame();
+        }
+        
+        function shareScore() {
+            const message = `🎯 من تو بازی تیراندازی اداری ${score} امتیاز گرفتم! میتونی بهتر از من بازی کنی؟`;
+            
+            if (tg && tg.initDataUnsafe.user) {
+                tg.switchInlineQuery(message, ['users', 'groups']);
+            } else {
+                // Fallback
+                if (navigator.share) {
+                    navigator.share({
+                        title: 'Office Shooting Gallery',
+                        text: message
+                    });
+                } else if (navigator.clipboard) {
+                    navigator.clipboard.writeText(message);
+                    alert('امتیاز کپی شد!');
+                } else {
+                    alert(message);
+                }
+            }
+        }
+        
+        // Event listeners
+        canvas.addEventListener('click', handleClick);
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            handleClick(e);
+        });
+        canvas.addEventListener('touchmove', updateCrosshair);
+        canvas.addEventListener('mousemove', updateCrosshair);
+        
+        // Prevent scrolling and zooming
+        document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+        document.addEventListener('gesturestart', (e) => e.preventDefault());
+        document.addEventListener('gesturechange', (e) => e.preventDefault());
+        
+        // Initialize
+        updateUI();
+        document.getElementById('highScore').textContent = highScore;
+        
+        // Adapt to Telegram theme
+        if (tg && tg.colorScheme === 'dark') {
+            document.body.style.background = 'linear-gradient(135deg, #2c3e50 0%, #34495e 100%)';
+        }
+        
+        // Auto-resize canvas
+        function resizeCanvas() {
+            const container = document.getElementById('gameContainer');
+            const containerWidth = container.clientWidth - 20;
+            const containerHeight = container.clientHeight - 20;
+            
+            const aspectRatio = 400 / 600;
+            let newWidth, newHeight;
+            
+            if (containerWidth / containerHeight > aspectRatio) {
+                newHeight = containerHeight;
+                newWidth = newHeight * aspectRatio;
+            } else {
+                newWidth = containerWidth;
+                newHeight = newWidth / aspectRatio;
+            }
+            
+            canvas.style.width = newWidth + 'px';
+            canvas.style.height = newHeight + 'px';
+        }
+        
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(resizeCanvas, 100);
+        });
+        
+        // Initial resize
+        resizeCanvas();
+    </script>
+</body>
+</html>
