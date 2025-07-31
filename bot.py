@@ -6,8 +6,8 @@ from datetime import datetime
 import os
 
 # Bot token from BotFather
-BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"  # Replace with your actual token
-GAME_URL = "https://your-website.com/index.html"  # Replace with your game URL
+BOT_TOKEN = "8145451120:AAGVYFXJEnRUaNFOlbI0uPDxLHzRKzdZ2qE"  # Replace with your actual token
+GAME_URL = "https://kasra-dastranj.github.io/telegram-game-bot1/"  # Replace with your game URL
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
